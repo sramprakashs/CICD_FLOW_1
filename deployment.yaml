@@ -1,0 +1,35 @@
+piVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pythonapp
+  labels:
+    app: pythonapp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pythonapp
+  template:
+    metadata:
+      labels:
+        app: pythonapp
+    spec:
+      containers:
+      - name: pythonapp
+        image: sudhsriv510/pythonapp:latest
+        ports:
+        - containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pythonapp-service
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    port: 3000
+    targetPort: 3000
+    protocol: TCP
+  selector:
+    app: pythonapp
