@@ -8,7 +8,7 @@ on:
     branches:
       - main
 jobs:
-  build-and-scan:
+  build-and-scan-1:
     runs-on: ubuntu-latest
     env:
       DOCKER_IMAGE: ramprakashs/pythonapp
