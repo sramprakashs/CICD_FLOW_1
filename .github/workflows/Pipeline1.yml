@@ -89,7 +89,13 @@ jobs:
         #  docker tag bayerecr:latest public.ecr.aws/i1i2o2v2/bayerapp:latest
         #  docker push public.ecr.aws/i1i2o2v2/bayerapp:latest
         #  docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
-        # docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG          
+        # docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
+      - name: Install kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/kubectl
+          
       - name: Install kubectl
         uses: azure/setup-kubectl@v2.0
         with:
