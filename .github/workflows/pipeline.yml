@@ -1,8 +1,8 @@
 name: Python Applications CI/CD
 on:
-  push:
-    branches:
-      - main
+#  push:
+#    branches:
+#      - main
   workflow_dispatch: null
   pull_request:
     branches:
