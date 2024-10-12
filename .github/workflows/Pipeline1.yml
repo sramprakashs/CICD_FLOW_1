@@ -98,14 +98,16 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
           
-      - name: Update kubeconfig for EKS 
+      - name: Update kubeconfig for EKS        
+        run: |
+          aws eks update-kubeconfig --name bayerapp --region us-east-1
+
+      - name: Deploy Pod to EKS
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           REPOSITORY: bayerapp
           IMAGE_TAG: ${{ github.sha }}
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}          
-        run: |
-          aws eks update-kubeconfig --name bayerapp --region us-east-1
       - run:
          kubectl apply -f deployment.yaml
