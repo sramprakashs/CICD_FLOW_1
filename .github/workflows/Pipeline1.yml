@@ -96,7 +96,7 @@ jobs:
                   
       - name: Update kubeconfig for EKS        
         run: |
-          aws eks update-kubeconfig --name bayerapp --region us-east-1 --kubeconfig /tmp/kubeconfig
+          aws eks update-kubeconfig --name hackathon-k8s --region us-east-1 
 
       - name: Verify kubectl Installation
         run: |
