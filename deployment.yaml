@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: pythonapp
-        image: ramprakashs/pythonapp:latest
+        image: 266552803564.dkr.ecr.us-east-1.amazonaws.com/bayerapp:latest #ramprakashs/pythonapp:latest
         ports:
         - containerPort: 3000
 ---
