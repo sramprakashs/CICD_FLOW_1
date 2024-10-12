@@ -85,12 +85,7 @@ jobs:
           sudo mv kubectl /usr/local/bin/kubectl
 
       # Step 4: Update kubeconfig to access EKS cluster
-      - name: Update kubeconfig for EKS
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-      - name: Login to Amazon ECR & Deploy      
+      - name: Update kubeconfig for EKS     
         run: |
           aws eks update-kubeconfig --name bayerapp --region us-east-1 
       - run:
