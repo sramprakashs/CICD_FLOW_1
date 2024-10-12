@@ -101,10 +101,7 @@ jobs:
       - name: Verify kubectl Installation
         run: |
            kubectl version --client
-      
-      - name: Debug kubeconfig
-        run: cat ~/.kube/config
-  
+ 
       - name: Deploy Pod to EKS
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
