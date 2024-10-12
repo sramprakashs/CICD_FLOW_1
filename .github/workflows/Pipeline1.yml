@@ -87,6 +87,6 @@ jobs:
       # Step 4: Update kubeconfig to access EKS cluster
       - name: Update kubeconfig for EKS
         run: |
-          aaws eks update-kubeconfig --name bayerapp --region us-east-1 
+          aws eks update-kubeconfig --name bayerapp --region us-east-1 
       - run:
          kubectl apply -f deployment.yaml
