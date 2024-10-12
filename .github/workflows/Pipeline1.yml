@@ -99,6 +99,10 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
           
       - name: Update kubeconfig for EKS 
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: bayerapp
+          IMAGE_TAG: ${{ github.sha }}          
         run: |
           aws eks update-kubeconfig --name bayerapp --region us-east-1
       - run:
