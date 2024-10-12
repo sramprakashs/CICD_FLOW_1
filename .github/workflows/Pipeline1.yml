@@ -96,6 +96,10 @@ jobs:
         run: |
           aws eks update-kubeconfig --name bayerapp --region us-east-1
 
+      - name: Verify kubectl Installation
+        run: |
+           kubectl version --client
+
       - name: Deploy Pod to EKS
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
