@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: pythonapp
-        image: 266552803564.dkr.ecr.us-east-1.amazonaws.com/bayerapp:latest
+        image: arn:aws:eks:us-east-1:266552803564:cluster/bayerapp:latest
         ports:
         - containerPort: 3000
 ---
