@@ -1,4 +1,4 @@
-name: Python Applications CI/CD-1 
+name: Python Applications CI/CD-1
 on:
   push:
     branches:
