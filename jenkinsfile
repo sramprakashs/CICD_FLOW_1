@@ -154,6 +154,191 @@ pipeline {
         }
         
         stage('Sanity Check') {
+pipeline {
+    agent any   
+    environment {
+        EMAIL_RECIPIENTS = "team_mail@newlookproject.com"
+        
+        GITHUB_TOKEN = credentials("new-jenkins-git-key")
+        SONAR_AUTH_TOKEN = credentials("SEE_CFT_develop_sonarqube_Token")
+        SONAR_HOST_URL = 'http://13.211.231.154:9000'
+        SONAR_SCANNER_HOME = '/opt/sonar-scanner/bin'
+        NODEJS_HOME= '/opt/nodejs/bin'
+        PATH = "${SONAR_SCANNER_HOME}:${NODEJS_HOME}:${env.PATH}"
+    }
+
+    stages {
+        stage('Init') {
+            steps {
+                echo 'Init....'
+                
+
+                
+                script {
+                    // Set the TARGET_BRANCH variable based on the Jenkins environment
+                    env.TARGET_BRANCH = env.CHANGE_TARGET ?: env.GIT_BRANCH ?: 'feature'
+                    echo "Target Branch: ${env.TARGET_BRANCH}"                    
+                    
+                    // Define the SONAR_PROJECT variable based on some logic or input
+                    env.SONAR_PROJECT = 'CFT_develop' // Set a default or initial value                    
+                    
+                    if (env.TARGET_BRANCH == 'master') {
+                        echo "Deploying to the main environment..."
+                        env.SONAR_PROJECT = 'SEE_CFT_master'
+                    } else if (env.TARGET_BRANCH == 'release') {
+                        echo "Deploying to the release environment..."
+                        env.SONAR_PROJECT = 'SEE_CFT_release'
+                    } else if (env.TARGET_BRANCH == 'develop') {
+                        echo "Deploying to the release environment..."
+                        env.SONAR_PROJECT = 'SEE_CFT_develop'
+                    } else if (env.TARGET_BRANCH == 'devops_pipeline') {
+                        echo "Deploying to the Devops Pipeline environment..."
+                        env.SONAR_PROJECT = 'SEE_CFT_Feature'
+                    } else if (env.TARGET_BRANCH.startsWith('feature')) {
+                        echo "Deploying to the feature environment..."
+                        env.SONAR_PROJECT = 'SEE_CFT_Feature'
+                    } else {
+                        error "Invalid TARGET_BRANCH: ${env.TARGET_BRANCH}"
+                    }
+                }
+            }
+        }        
+        stage('Pylint Analysis') {
+            steps {
+                sh '''
+                    . /var/lib/jenkins/pylint/.venv/bin/activate
+                    pylint --rcfile=.pylintrc --fail-under=-1 . > SEE_CFT_DEV_pylint_report.txt | tee SEE_CFT_DEV_pylint_report.txt
+                    #pylint --rcfile=.pylintrc server/__init__.py > SEE_CFT_DEV_pylint_report.txt
+                    #pylint --rcfile=.pylintrc server/app.py > SEE_CFT_DEV_pylint_report.txt | tee SEE_CFT_DEV_pylint_report.txt
+                    #pylint --rcfile=.pylintrc server/app.py > SEE_CFT_DEV_pylint_report.txt | tee SEE_CFT_DEV_pylint_report.txt
+                    #pylint --rcfile=.pylintrc perfect_code.py > SEE_CFT_DEV_pylint_report.txt
+                    #pylint --rcfile=.pylintrc --fail-under=5 perfect_code.py > SEE_CFT_DEV_pylint_report.txt
+                    echo "Pylint exit code : $?"
+                '''
+            }
+        }
+
+        stage('Unit Test') {
+            steps {
+                sh '''
+                    . /var/lib/jenkins/pytest/.venv/bin/activate
+                    python --version
+                    pwd
+                    pip install -r /var/lib/jenkins/pytest/requirements.txt
+                    # pytest --maxfail=10 -v --log-level=WARNING --log-file=SEE_CFT_DEV_pytest_warning.log
+                    pytest --maxfail=10 -v --log-level=WARNING --log-file=SEE_CFT_DEV_pytest_warning.log --continue-on-collection-errors 
+                    pytest --cov=. --cov-report=xml --junitxml='SEE_CFT_DEV_UNIT_Test_coverage_report.xml'  || true
+                    # pytest --collect-only
+                '''
+            }
+        }
+
+        stage('Functional Test') {
+            steps {
+                echo 'Functinal test goes here...'
+                sh '''
+                    . /var/lib/jenkins/selenium/.venv/bin/activate
+                    python --version
+                    pwd
+                    cp requirements.txt /var/lib/jenkins/selenium/requirements.txt
+                    pip install -r /var/lib/jenkins/selenium/requirements.txt
+                    pytest /var/lib/jenkins/workspace/devops_pipeline_devops_pipeline/selenium_tests/test_selenium.py
+                '''                
+            }
+        }        
+        
+        stage('Archive Report') {
+            steps {
+                // Archive the pylint report
+                archiveArtifacts artifacts: 'SEE_CFT_DEV_pylint_report.txt', allowEmptyArchive: true
+                
+                // Archive the Test coverage report results
+                archiveArtifacts artifacts: 'SEE_CFT_DEV_UNIT_Test_coverage_report.xml', allowEmptyArchive: true                  
+            }
+        }
+        
+        stage('Publish Report') {
+            steps {
+                script {
+                    // Read the pylint report
+                    def pylintReport = readFile 'SEE_CFT_DEV_pylint_report.txt'
+                    echo pylintReport
+
+                    // Extract the current rating
+                    def currentRating = sh(script: "grep 'Your code has been rated at' SEE_CFT_DEV_pylint_report.txt | sed -E 's/Your code has been rated at ([0-9.]+)\\/10.*/\\1/'", returnStdout: true).trim()
+
+                    // Extract the previous rating
+                    def previousRating = sh(script: "grep 'Your code has been rated at' SEE_CFT_DEV_pylint_report.txt | sed -E 's/Your code has been rated at [0-9.]+\\/10 \\(previous run: ([0-9.]+)\\/10.*/\\1/'", returnStdout: true).trim()
+
+                    // Calculate the difference
+                    def ratingDifference = Float.parseFloat(currentRating) - Float.parseFloat(previousRating)
+
+                    // Print the results
+                    echo "Current Pylint rating: ${currentRating}"
+                    echo "Previous Pylint rating: ${previousRating}"
+                    echo "Rating difference: ${ratingDifference}"
+
+                    // Fail the build if the rating is below 5
+                    if (Float.parseFloat(currentRating) < 5) {
+                        echo "Pylint rating is below 5. Build failed."
+                        currentBuild.result = 'FAILURE'
+                    }
+                }
+            }
+
+        }
+
+        stage('Sonar Scan') {
+            steps {
+                echo 'Analysis using Sonar Scan...'
+                sh """
+                    sonar-scanner \\
+                      -Dsonar.projectKey=${env.SONAR_PROJECT} \\
+                      -Dsonar.sources=. \\
+                      -Dsonar.python.coverage.reportPaths=coverage.xml\\
+                      -Dsonar.host.url=${SONAR_HOST_URL} \\
+                      -Dsonar.login=${SONAR_AUTH_TOKEN}
+                """
+            }
+        }
+
+        stage('Build') {
+            steps {
+                echo 'Building Deployable Docker Image...'
+                // --> Type 1
+                //sshPublisher(publishers: [sshPublisherDesc(configName: 'devops-docker-ssh', transfers: [sshTransfer(sourceFiles: '/var/lib/jenkins/workspace/devops_pipeline_devops_pipeline/**/*', remoteDirectory: '/home/jenkins/docker-build', execCommand: 'cd /home/jenkins/docker-build && docker compose build')])])
+                
+                // --> Type 2
+                // sh """
+                // scp -r /var/lib/jenkins/workspace/devops_pipeline_devops_pipeline/* jenkins@devops-docker:/home/jenkins/docker-build/
+                // ssh jenkins@devops-docker 'cd /home/jenkins/docker-build && docker compose build'
+                // """
+                
+                // --> Type 3
+                sh """
+                  scp -r /var/lib/jenkins/workspace/devops_pipeline_devops_pipeline/* jenkins@devops-docker:/home/jenkins/docker-build/
+                  ssh jenkins@devops-docker 'cd /home/jenkins/docker-build && docker compose build > docker-compose-build.log 2>&1'
+                  scp jenkins@devops-docker:/home/jenkins/docker-build/docker-compose-build.log .
+                """
+                sh 'cat docker-compose-build.log'
+                
+            }
+        }
+
+        stage('Update Release version') {
+            steps {
+                echo 'Updating Release version...'
+            }
+        }        
+
+        stage('Publish to Artifactory') {
+            steps {
+                echo 'Deploying...'
+                // artifactoryPublish buildInfo: artifactory.buildInfo, context: 'artifactory_context', server: artifactoryServer
+            }
+        }
+        
+        stage('Sanity Check') {
             steps {
                 echo 'Deploying...'
                 // sh 'curl -s your-api-endpoint | grep "OK"'
@@ -182,26 +367,40 @@ pipeline {
                 def sha = env.GIT_COMMIT
                
                 if (env.GIT_URL.startsWith('git@')) {
-                    // SSH format: git@wwwin-github.newlook.com:SEE/production-gui.git
+                    // SSH format: git@wwwin-github.newlookproject.com:SEE/sample-project-FE.git
+                    def parts = env.GIT_URL.split(':')
+                    if (parts.length == 2) {  // Ensure the split was successful
+                        def hostAndPath = parts[1]
+                        def pathParts = hostAndPath.split('/')
+                        if (pathParts.length > 1) { // Check if path has owner and repo
+                            def owner = pathParts[0]
+                            def repo = pathParts[1].replace('.git', '') // Remove .git if present
+                            println "Owner (SSH): ${owner}"
+                            println "Repo (SSH): ${repo}"
+                        } else {
+                            println "Invalid SSH Git URL format: ${env.GIT_URL}"
+                            def owner = "unknown"
+                            def repo = "unknown"
+                        }
+                    } else {
+                        println "Invalid SSH Git URL format: ${env.GIT_URL}"
+                        def owner = "unknown"
+                        def repo = "unknown"
+                    }
 
                 } else if (env.GIT_URL.startsWith('https://')) {
-                    // HTTPS format: https://wwwin-github.newlook.com/SEE/production-gui.git
-
+                    // HTTPS format: https://wwwin-github.newlookproject.com/SEE/sample-project-FE.git
                     def gitParts = env.GIT_URL.split('/')
-                    def repo = gitParts.size() > 3 ? gitParts[3].replace('.git', '') : 'unknown'
-                    def owner = gitParts[3]
-                }
-                
-                if (env.GIT_URL.startsWith('git@')) {
-                    // SSH format: git@wwwin-github.newlook.com:SEE/production-gui.git
-                    
-                }
-                else if (env.GIT_URL.startsWith('https://')) {
-                    // HTTPS format: https://wwwin-github.newlook.com/SEE/production-gui.git
+                    def owner = gitParts.size() > 4 ? gitParts[3] : 'unknown' // Corrected index
+                    def repo = gitParts.size() > 4 ? gitParts[4].replace('.git', '') : 'unknown' // Corrected index and .git removal
+                    println "Owner (HTTPS): ${owner}"
+                    println "Repo (HTTPS): ${repo}"
 
-                    // def repo = env.GIT_URL?.tokenize('/')?.size() > 3 ? env.GIT_URL.tokenize('/')[3].replace('.git', '') : 'unknown'
-                    // def owner = env.GIT_URL.split('/')[3]
-                }                 
+                } else {
+                    println "Unsupported Git URL format: ${env.GIT_URL}"
+                    def owner = "unknown"
+                    def repo = "unknown"
+                }                
                 
                 def buildTime = new Date().format("yyyy-MM-dd HH:mm:ss")
                 def commitCount = sh(script: "git rev-list --count ${env.GIT_COMMIT}", returnStdout: true).trim()
@@ -209,14 +408,14 @@ pipeline {
                 echo "ENV_GIT_URL ${env.GIT_URL}"
                 echo "ENV_GIT_COMMIT ${env.GIT_COMMIT}"
                 echo "ENV_BUILD_URL ${env.BUILD_URL}"
-                echo "owner ${owner}"
+                echo "owner ${env.owner}"
                 
                 // Update GitHub status
                 
                 sh """
                 curl -X POST -H "Authorization: token ${GITHUB_TOKEN}" \
                 -d '{"state": "success", "target_url": "${env.BUILD_URL}", "description": "Build succeeded", "context": "continuous-integration/jenkins"}' \
-                https://api.github.com/repos/${owner}/${repo}/statuses/${sha}
+                https://api.github.com/repos/${env.owner}/${env.repo}/statuses/${sha}
                 """                
                 
                 /*
