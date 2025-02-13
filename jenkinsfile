@@ -11,12 +11,41 @@ pipeline {
         PATH = "${SONAR_SCANNER_HOME}:${NODEJS_HOME}:${env.PATH}"
     }
 
-    stages {
         stage('Init') {
             steps {
                 echo 'Init....'
+                
+
+                
+                script {
+                    // Set the TARGET_BRANCH variable based on the Jenkins environment
+                    env.TARGET_BRANCH = env.CHANGE_TARGET ?: env.GIT_BRANCH ?: 'feature'
+                    echo "Target Branch: ${env.TARGET_BRANCH}"                    
+                    
+                    // Define the SONAR_PROJECT variable based on some logic or input
+                    env.SONAR_PROJECT = 'CFT_develop' // Set a default or initial value                    
+                    
+                    if (env.TARGET_BRANCH == 'master') {
+                        echo "Deploying to the main environment..."
+                        env.SONAR_PROJECT = 'SEE_CFT_master'
+                    } else if (env.TARGET_BRANCH == 'release') {
+                        echo "Deploying to the release environment..."
+                        env.SONAR_PROJECT = 'SEE_CFT_release'
+                    } else if (env.TARGET_BRANCH == 'develop') {
+                        echo "Deploying to the release environment..."
+                        env.SONAR_PROJECT = 'SEE_CFT_develop'
+                    } else if (env.TARGET_BRANCH == 'devops_pipeline') {
+                        echo "Deploying to the Devops Pipeline environment..."
+                        env.SONAR_PROJECT = 'SEE_CFT_Feature'
+                    } else if (env.TARGET_BRANCH.startsWith('feature')) {
+                        echo "Deploying to the feature environment..."
+                        env.SONAR_PROJECT = 'SEE_CFT_Feature'
+                    } else {
+                        error "Invalid TARGET_BRANCH: ${env.TARGET_BRANCH}"
+                    }
+                }
             }
-        }
+        } 
         
         stage('Pylint Analysis') {
             steps {
